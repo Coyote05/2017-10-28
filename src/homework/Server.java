@@ -7,6 +7,11 @@ import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.ParameterMode;
+import javax.persistence.Persistence;
+import javax.persistence.StoredProcedureQuery;
 import org.json.JSONObject;
 
 /**
@@ -41,14 +46,7 @@ public class Server {
             int jsonBool = 0;
             int jsonNull = 0;
             int errorCode = 0;
-            int jsonObjectMax = 0;
-            int jsonStringMax = 0;
-            int jsonNumberMax = 0;
-            int jsonArrayMax = 0;
-            int jsonBoolMax = 0;
-            int jsonNullMax = 0;
-            int errorCodeMax = 0;
-            String errorMsg = null;
+            String errorMsg = "";
 
             @Override
             public void run() {
@@ -59,60 +57,205 @@ public class Server {
 
                     String line = reader.readLine();
 
-                    JSONObject jSONObject = new JSONObject(line);
-                    
-                    for (Map.Entry<String, Object> key : jSONObject.toMap().entrySet()) {
+                    if (line.contains("firstName")) {
 
-                        if (key.getKey().equals("json_object")) {
+                        JSONObject jSONOb = new JSONObject(line);
 
-                            jsonObject++;
+                        for (Map.Entry<String, Object> key : jSONOb.toMap().entrySet()) {
+
+                            Object object = key.getValue();
+
+                            if (object instanceof Integer == false || object instanceof String == false) {
+
+                                JSONObject isObject = new JSONObject(object);
+                                for (Map.Entry<String, Object> value : isObject.toMap().entrySet()) {
+
+                                    Object ob = value.getValue();
+                                    if (ob instanceof Object[]) {
+                                        jsonArray++;
+                                    }
+
+                                    if (ob instanceof Object) {
+                                        jsonObject++;
+                                    }
+                                }
+                            }
+
+                            if (object instanceof String) {
+                                jsonString++;
+                            }
+
+                            if (object instanceof Integer) {
+                                jsonNumber++;
+                            }
+
+                            if (object instanceof Object[]) {
+                                jsonArray++;
+                            }
+
+                            if (object instanceof Boolean) {
+                                jsonBool++;
+                            }
                         }
 
-                        if (key.getKey().equals("json_string")) {
+                        EntityManagerFactory emf = Persistence.createEntityManagerFactory("2017-10-28PU");
+                        EntityManager em = emf.createEntityManager();
 
-                            jsonString++;
-                        }
+                        StoredProcedureQuery spq = em.createStoredProcedureQuery("updateStat");
+                        spq.registerStoredProcedureParameter("json_object", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_object", jsonObject);
+                        spq.registerStoredProcedureParameter("json_string", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_string", jsonString);
+                        spq.registerStoredProcedureParameter("json_number", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_number", jsonNumber);
+                        spq.registerStoredProcedureParameter("json_array", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_array", jsonArray);
+                        spq.registerStoredProcedureParameter("json_bool", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_bool", jsonBool);
+                        spq.registerStoredProcedureParameter("json_null", Integer.class, ParameterMode.IN);
+                        spq.setParameter("json_null", jsonNull);
+                        spq.execute();
+                        em.close();
 
-                        if (key.getKey().equals("json_number")) {
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
 
-                            jsonNumber++;
-                        }
+                        jSONObject.put("json_object", jsonObject);
+                        jSONObject.put("json_string", jsonString);
+                        jSONObject.put("json_number", jsonNumber);
+                        jSONObject.put("json_array", jsonArray);
+                        jSONObject.put("json_bool", jsonBool);
+                        jSONObject.put("json_null", jsonNull);
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
 
-                        if (key.getKey().equals("json_array")) {
-
-                            jsonArray++;
-                        }
-
-                        if (key.getKey().equals("json_bool")) {
-
-                            jsonBool++;
-                        }
-
-                        if (key.getKey().equals("json_null")) {
-
-                            jsonNull++;
-                        }
+                        writer.write(response.toString());
+                        writer.flush();
                     }
 
-                    jSONObject.put("json_object", jsonObject);
-                    jSONObject.put("json_string", jsonString);
-                    jSONObject.put("json_number", jsonNumber);
-                    jSONObject.put("json_array", jsonArray);
-                    jSONObject.put("json_bool", jsonBool);
-                    jSONObject.put("json_null", jsonNull);
-                    jSONObject.put("error_code", errorCode);
-                    jSONObject.put("error_msg", errorMsg);
+                    if (line.contains("get_full_stat_all")) {
 
-                    writer.write(jSONObject.toString());
-                    writer.flush();
-                    
-                    jsonObjectMax += jsonObject;
-                    jsonStringMax += jsonString;
-                    jsonNumberMax += jsonNumber;
-                    jsonArrayMax += jsonArray;
-                    jsonBoolMax += jsonBool;
-                    jsonNullMax += jsonNull;
-                    errorCodeMax += errorCode;
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_object", stat.getJsonObject());
+                        jSONObject.put("json_string", stat.getJsonString());
+                        jSONObject.put("json_number", stat.getJsonNumber());
+                        jSONObject.put("json_array", stat.getJsonArray());
+                        jSONObject.put("json_bool", stat.getJsonBool());
+                        jSONObject.put("json_null", stat.getJsonNull());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_object")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_object", stat.getJsonObject());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_string")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_string", stat.getJsonString());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_number")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_number", stat.getJsonNumber());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_array")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_array", stat.getJsonArray());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_bool")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_bool", stat.getJsonBool());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
+
+                    if (line.contains("get_full_stat_json_null")) {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+                        Stat stat = new Stat();
+
+                        jSONObject.put("json_null", stat.getJsonNull());
+                        jSONObject.put("error_code", errorCode);
+                        jSONObject.put("error_msg", errorMsg);
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+
+                    } else {
+
+                        JSONObject jSONObject = new JSONObject();
+                        JSONObject response = new JSONObject();
+
+                        jSONObject.put("error_code", 999);
+                        jSONObject.put("error_msg", "Érvénytelen paraméter: <HIBÁS PARAMÉTER>");
+                        response.put("response", jSONObject);
+
+                        writer.write(response.toString());
+                        writer.flush();
+                    }
 
                 } catch (IOException ex) {
                     errorCode++;
